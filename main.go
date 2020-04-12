@@ -1,11 +1,15 @@
 package main
 
 import (
-	"delivery-slot-checker/internal/work"
+	"delivery-slot-checker/domain/work"
 	"fmt"
-	"github.com/joho/godotenv"
+	"io/ioutil"
 	"log"
 	"os"
+
+	"gopkg.in/yaml.v2"
+
+	"github.com/joho/godotenv"
 )
 
 // requiredEnv represents the env keys required by our program
@@ -25,16 +29,28 @@ func main() {
 		}
 	}
 
-	asdaCheckDeliverySlotsJob := work.Job{
-		Name:     "asda-check-delivery-slots-job",
-		Task:     work.AsdaCheckDeliverySlotsTask,
-		Interval: 600,
+	// retrieve and parse task payloads
+	var taskPayloads []work.TaskPayload
+	taskPayloadsFileContents, err := ioutil.ReadFile("./data/task/payloads.yml")
+	if err != nil {
+		log.Fatal(err)
+	}
+	err = yaml.Unmarshal(taskPayloadsFileContents, &taskPayloads)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// configure Asda job
+	asdaDeliverySlotsJob := work.Job{
+		Identifier: "asda-delivery-slots",
+		Task:       work.AsdaDeliverySlotsTask,
+		Payloads:   taskPayloads,
 	}
 
 	runner := work.Runner{
 		Writer: os.Stdout,
 		Jobs: []work.Job{
-			asdaCheckDeliverySlotsJob,
+			asdaDeliverySlotsJob,
 		},
 	}
 

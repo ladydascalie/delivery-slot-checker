@@ -23,6 +23,7 @@ type DailySchedule struct {
 // DeliveryManifest represents a series of DailySchedules
 type DeliveryManifest struct {
 	MerchantName   string
+	Postcode       string
 	From           time.Time
 	Until          time.Time
 	DailySchedules []DailySchedule
@@ -37,9 +38,10 @@ func (m DeliveryManifest) AsMessageText(name string) string {
 	}
 
 	return fmt.Sprintf(
-		"Hi %s, %s forthcoming slots as at %s: %s",
+		"Hi %s, forthcoming slots for %s (%s) correct at %s: %s",
 		name,
 		m.MerchantName,
+		m.Postcode,
 		time.Now().Format("3:04pm"),
 		strings.Join(summaries, ", "),
 	)
@@ -89,9 +91,10 @@ func (m DeliveryManifest) SortByDate(asc bool) {
 func (m *DeliveryManifest) FilterByAvailability(isAvailable bool) {
 	filteredManifest := DeliveryManifest{
 		MerchantName:   m.MerchantName,
+		Postcode:       m.Postcode,
 		From:           m.From,
 		Until:          m.Until,
-		DailySchedules: nil,
+		DailySchedules: []DailySchedule{},
 		Created:        m.Created,
 	}
 
@@ -106,13 +109,16 @@ func (m *DeliveryManifest) FilterByAvailability(isAvailable bool) {
 			}
 		}
 
-		filteredManifest.DailySchedules = append(filteredManifest.DailySchedules, filteredSchedule)
+		if len(filteredSchedule.Slots) > 0 {
+			filteredManifest.DailySchedules = append(filteredManifest.DailySchedules, filteredSchedule)
+		}
 	}
 
 	*m = filteredManifest
 }
 
-func NewDeliveryManifest(merchantName string, slots []DeliverySlot) (DeliveryManifest, error) {
+// NewDeliveryManifest populates a new DeliveryManifest from the provided merchantName and DeliverySlots
+func NewDeliveryManifest(merchantName string, postcode string, slots []DeliverySlot) (DeliveryManifest, error) {
 	scheduleMap := make(map[string]DailySchedule)
 
 	for _, slot := range slots {
@@ -133,6 +139,7 @@ func NewDeliveryManifest(merchantName string, slots []DeliverySlot) (DeliveryMan
 
 	manifest := DeliveryManifest{
 		MerchantName: merchantName,
+		Postcode:     postcode,
 		Created:      time.Now(),
 	}
 	for _, schedule := range scheduleMap {
@@ -152,11 +159,4 @@ func NewDeliveryManifest(merchantName string, slots []DeliverySlot) (DeliveryMan
 type Client interface {
 	GetName() string
 	GetDeliverySlots(locationID string, from, to time.Time) ([]DeliverySlot, error)
-}
-
-// NewClient instantiates the default Client
-func NewClient() Client {
-	return AsdaClient{
-		URL: "https://groceries.asda.com/api/v3",
-	}
 }
